@@ -780,7 +780,7 @@ vec3 fin(vec3 c,vec2 u){ c*=1.+.025*k*e3.w; c=1.-exp(-c*1.5); c=mix(vec3(dot(c,v
           if (srcNode) { try { srcNode.disconnect(); } catch { } srcNode = null; }
           if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
           el.pause(); rp = 0; prevLow = 0; liveBpm = 0; cand = 0; info = null; token++;
-          hadLiveAudio = false; quietSince = 0; quietGapDetected = false;
+          lastAutoBpm = 0; lastAutoSwitch = 0;
         }
         async function playFile(file) {
           stop(); ensure(); an.disconnect(); an.connect(ctx.destination);
@@ -816,12 +816,12 @@ vec3 fin(vec3 c,vec2 u){ c*=1.+.025*k*e3.w; c=1.-exp(-c*1.5); c=mix(vec3(dot(c,v
           const offset = 1 + Math.floor(Math.random() * (visuals.length - 1));
           setVis((vis.value + offset) % visuals.length);
         }
-        // Audio-file playback gives us a reliable end event. Live inputs use the
-        // quiet-gap detector in the animation loop because they have no track metadata.
+        // Audio files have a reliable end event. For live audio, use a sustained,
+        // meaningful BPM change instead of waiting for silence between songs.
         el.addEventListener("ended", () => {
           if (autoVisual.value) switchRandomVisual();
         });
-        let hadLiveAudio = false, quietSince = 0, quietGapDetected = false, lastAutoSwitch = 0;
+        let lastAutoBpm = 0, lastAutoSwitch = 0;
         const fs = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
         let mul = 1; const scale = x => mul = Math.min(4, Math.max(.25, mul * x));
 
@@ -872,22 +872,19 @@ vec3 fin(vec3 c,vec2 u){ c*=1.+.025*k*e3.w; c=1.-exp(-c*1.5); c=mix(vec3(dot(c,v
             cen += (Math.min(1, Math.max(0, Math.log((sw > 0 ? sx / sw : 30) / 8) / Math.log(25))) - cen) * (1 - Math.exp(-dt * 1.2));
             bassAvg += (rb - bassAvg) * .03; ons = sm(ons, Math.min(1, Math.max(0, (rb - bassAvg) * 4)), dt);
 
-            // For microphone/tab audio, infer a track boundary from a sustained
-            // quiet gap followed by audio returning. This intentionally ignores
-            // the initial silence before the first song starts.
-            if (autoVisual.value && src.value !== "file") {
-              const audioIsPresent = L.v > 0.025;
-              if (audioIsPresent) {
-                if (hadLiveAudio && quietGapDetected && now - lastAutoSwitch > 5000) {
+            // For microphone/tab audio, switch only when the detected tempo moves
+            // meaningfully from the last accepted tempo. Ignore small BPM wobble.
+            if (autoVisual.value && src.value !== "file" && liveBpm > 0) {
+              if (!lastAutoBpm) {
+                lastAutoBpm = liveBpm;
+              } else {
+                const bpmDifference = Math.abs(liveBpm - lastAutoBpm);
+                const meaningfulChange = bpmDifference >= Math.max(8, lastAutoBpm * 0.07);
+                if (meaningfulChange && now - lastAutoSwitch > 8000) {
                   switchRandomVisual();
                   lastAutoSwitch = now;
+                  lastAutoBpm = liveBpm;
                 }
-                hadLiveAudio = true;
-                quietSince = 0;
-                quietGapDetected = false;
-              } else if (hadLiveAudio) {
-                if (!quietSince) quietSince = now;
-                if (now - quietSince >= 2500) quietGapDetected = true;
               }
             }
             const target = (info ? info.bpm : (liveBpm || 100)) * mul;
