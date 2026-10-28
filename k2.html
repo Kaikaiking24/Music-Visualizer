@@ -835,7 +835,7 @@ vec3 fin(vec3 c,vec2 u){ c*=1.+.025*k*e3.w; c=1.-exp(-c*1.5); c=mix(vec3(dot(c,v
             .attr("x2", (d, i) => pt(i, 52 + d * 40)[0]).attr("y2", (d, i) => pt(i, 52 + d * 40)[1]);
           ring2.attr("r", 46 + k * 3).attr("opacity", .2 + .5 * k);
         }
-
+        
         // ---------- Frame loop ----------
         let last = performance.now(), P = 0, Fl = 0, bpmS = 100, corr = 0, bassAvg = 0, lastOnset = 0, shownAt = 0, fr = 0, acc = 0, df = 0;
         let Fb = 0, vpk = .1, en = 0, cen = .5, ons = 0, wpk = .2;
